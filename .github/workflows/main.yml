@@ -1,0 +1,525 @@
+# ╔══════════════════════════════════════════════════════════╗
+# ║  🟠  ORANGE CRYSTAL - CI/CD Pipeline                  ║
+# ║  GitHub Actions - Auto Deploy to Firebase + Cloudflare ║
+# ║  Version: 2026.1 Ultimate                              ║
+# ╚══════════════════════════════════════════════════════════╝
+
+name: 🟠 Orange Crystal Deploy
+
+# ═══════════════════════════════════════════════════════════
+# 🟠 TRIGGERS - متى يتم التشغيل
+# ═══════════════════════════════════════════════════════════
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - '**.html'
+      - '**.js'
+      - '**.py'
+      - 'scraper.py'
+      - '.github/workflows/main.yml'
+  
+  pull_request:
+    branches: [ main, master ]
+  
+  # تشغيل يدوي من GitHub
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: '🎯 هدف النشر'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - firebase
+          - cloudflare
+          - both
+  
+  # تشغيل مجدول كل يوم الساعة 3 صباحاً
+  schedule:
+    - cron: '0 3 * * *'
+
+# ═══════════════════════════════════════════════════════════
+# 🟠 ENVIRONMENT VARIABLES - متغيرات البيئة
+# ═══════════════════════════════════════════════════════════
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+  FIREBASE_PROJECT: comk-4302e
+  CLOUDFLARE_PROJECT: orange-crystal
+  DEPLOY_BRANCH: main
+
+# ═══════════════════════════════════════════════════════════
+# 🟠 JOBS - المهام
+# ═══════════════════════════════════════════════════════════
+
+jobs:
+  
+  # ═══════════════════════════════════════════════════════
+  # 🟠 1. BUILD & GENERATE - بناء وتوليد الملفات
+  # ═══════════════════════════════════════════════════════
+  build:
+    name: 🔨 Build & Generate Files
+    runs-on: ubuntu-latest
+    
+    outputs:
+      build_status: ${{ steps.build_files.outcome }}
+      total_lines: ${{ steps.count_lines.outputs.lines }}
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # No extra deps needed for scraper.py
+          echo "✅ Python ready"
+      
+      - name: 🟠 Run Scraper - Generate All Files
+        id: build_files
+        run: |
+          echo "🚀 Running Orange Crystal Generator..."
+          python scraper.py
+          echo ""
+          echo "📁 Generated Files:"
+          ls -la *.html *.js 2>/dev/null || echo "⚠️ Some files missing"
+          echo ""
+          echo "📊 File Count:"
+          find . -maxdepth 1 -name "*.html" -o -name "*.js" | wc -l
+          echo ""
+          echo "✅ Build Complete!"
+        continue-on-error: false
+      
+      - name: 📊 Count Total Lines
+        id: count_lines
+        run: |
+          lines=$(cat *.html *.js 2>/dev/null | wc -l)
+          echo "lines=$lines" >> $GITHUB_OUTPUT
+          echo "📝 Total Lines: $lines"
+      
+      - name: 📦 Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: orange-crystal-build
+          path: |
+            *.html
+            *.js
+          retention-days: 7
+          compression-level: 6
+      
+      - name: 📋 List All Generated Files
+        run: |
+          echo "📁 Complete File List:"
+          echo "══════════════════════════════"
+          for file in *.html *.js; do
+            if [ -f "$file" ]; then
+              size=$(wc -c < "$file")
+              lines=$(wc -l < "$file")
+              printf "  📄 %-25s %6d lines  %6d bytes\n" "$file" "$lines" "$size"
+            fi
+          done
+          echo "══════════════════════════════"
+
+  # ═══════════════════════════════════════════════════════
+  # 🟠 2. VALIDATE - فحص الملفات
+  # ═══════════════════════════════════════════════════════
+  validate:
+    name: ✅ Validate Files
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: 📥 Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: orange-crystal-build
+      
+      - name: 🔍 HTML Validation
+        run: |
+          echo "🔍 Checking HTML files..."
+          html_count=$(ls *.html 2>/dev/null | wc -l)
+          echo "  📄 HTML files found: $html_count"
+          
+          for file in *.html; do
+            if [ -f "$file" ]; then
+              # Check DOCTYPE
+              if head -1 "$file" | grep -q "DOCTYPE"; then
+                echo "  ✅ $file - DOCTYPE valid"
+              else
+                echo "  ⚠️ $file - Missing DOCTYPE"
+              fi
+              
+              # Check encoding
+              if grep -q "charset" "$file"; then
+                echo "     ✅ encoding declared"
+              fi
+              
+              # Count script tags
+              scripts=$(grep -c '<script' "$file" || true)
+              echo "     📜 scripts: $scripts"
+            fi
+          done
+      
+      - name: 🔍 JavaScript Validation
+        run: |
+          echo "🔍 Checking JavaScript files..."
+          js_count=$(ls *.js 2>/dev/null | wc -l)
+          echo "  📜 JS files found: $js_count"
+          
+          for file in *.js; do
+            if [ -f "$file" ]; then
+              # Check syntax with Node
+              node -c "$file" 2>/dev/null && echo "  ✅ $file - syntax OK" || echo "  ⚠️ $file - syntax issues"
+            fi
+          done
+      
+      - name: 📏 File Size Check
+        run: |
+          echo "📏 File Size Report:"
+          echo "══════════════════════════════"
+          for file in *.html *.js; do
+            if [ -f "$file" ]; then
+              size_kb=$(du -k "$file" | cut -f1)
+              if [ $size_kb -gt 500 ]; then
+                echo "  ⚠️ $file - ${size_kb}KB (Large!)"
+              else
+                echo "  ✅ $file - ${size_kb}KB"
+              fi
+            fi
+          done
+
+  # ═══════════════════════════════════════════════════════
+  # 🟠 3. DEPLOY TO FIREBASE - نشر على Firebase
+  # ═══════════════════════════════════════════════════════
+  deploy-firebase:
+    name: 🔥 Deploy to Firebase
+    runs-on: ubuntu-latest
+    needs: validate
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' && 
+      (github.event.inputs.deploy_target == 'firebase' || github.event.inputs.deploy_target == 'both')
+    
+    environment:
+      name: production
+      url: https://comk-4302e.web.app
+    
+    steps:
+      - name: 📥 Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: orange-crystal-build
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install Firebase CLI
+        run: |
+          npm install -g firebase-tools
+          firebase --version
+          echo "✅ Firebase CLI installed"
+      
+      - name: 📝 Create Firebase Config Files
+        run: |
+          # firebase.json
+          cat > firebase.json << 'FIREBASEEOF'
+          {
+            "hosting": {
+              "public": ".",
+              "ignore": [
+                "firebase.json",
+                "**/.*",
+                "**/node_modules/**",
+                "scraper.py",
+                ".github/**",
+                "README.md"
+              ],
+              "rewrites": [
+                {
+                  "source": "**",
+                  "destination": "/index.html"
+                }
+              ],
+              "headers": [
+                {
+                  "source": "**/*.@(html|js|css)",
+                  "headers": [
+                    {
+                      "key": "Cache-Control",
+                      "value": "max-age=3600"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    }
+                  ]
+                },
+                {
+                  "source": "**/*.@(jpg|jpeg|png|gif|svg|webp|ico)",
+                  "headers": [
+                    {
+                      "key": "Cache-Control",
+                      "value": "max-age=86400"
+                    }
+                  ]
+                }
+              ],
+              "cleanUrls": true,
+              "trailingSlash": false
+            }
+          }
+          FIREBASEEOF
+          
+          # .firebaserc
+          cat > .firebaserc << 'RCEOF'
+          {
+            "projects": {
+              "default": "comk-4302e"
+            }
+          }
+          RCEOF
+          
+          echo "✅ Firebase config created"
+      
+      - name: 🔥 Deploy to Firebase Hosting
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          echo "🚀 Deploying to Firebase..."
+          firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT }} \
+            --token "$FIREBASE_TOKEN" \
+            --non-interactive \
+            --message "🟠 Deploy: ${{ github.sha }} - ${{ github.event.head_commit.message }}"
+          
+          echo ""
+          echo "✅ Deployed to Firebase!"
+          echo "🌐 URL: https://${{ env.FIREBASE_PROJECT }}.web.app"
+          echo "🌐 URL: https://${{ env.FIREBASE_PROJECT }}.firebaseapp.com"
+      
+      - name: 📊 Deployment Summary
+        run: |
+          echo "╔══════════════════════════════════════╗"
+          echo "║  🔥 FIREBASE DEPLOY SUCCESS         ║"
+          echo "╠══════════════════════════════════════╣"
+          echo "║  Project: ${{ env.FIREBASE_PROJECT }}"
+          echo "║  Commit:  ${{ github.sha }}"
+          echo "║  Branch:  ${{ env.DEPLOY_BRANCH }}"
+          echo "║  Time:    $(date '+%Y-%m-%d %H:%M')"
+          echo "╚══════════════════════════════════════╝"
+
+  # ═══════════════════════════════════════════════════════
+  # 🟠 4. DEPLOY TO CLOUDFLARE - نشر على Cloudflare
+  # ═══════════════════════════════════════════════════════
+  deploy-cloudflare:
+    name: ☁️ Deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    needs: validate
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' && 
+      (github.event.inputs.deploy_target == 'cloudflare' || github.event.inputs.deploy_target == 'both')
+    
+    environment:
+      name: production
+      url: https://orange-crystal.pages.dev
+    
+    steps:
+      - name: 📥 Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: orange-crystal-build
+      
+      - name: 📝 Prepare Cloudflare Config
+        run: |
+          # Create _headers for Cloudflare
+          cat > _headers << 'HEADERSEOF'
+          /*
+            X-Frame-Options: DENY
+            X-Content-Type-Options: nosniff
+            Referrer-Policy: strict-origin-when-cross-origin
+            
+          /*.html
+            Cache-Control: max-age=3600
+            Content-Type: text/html; charset=utf-8
+            
+          /*.js
+            Cache-Control: max-age=3600
+            Content-Type: application/javascript; charset=utf-8
+            
+          /*.css
+            Cache-Control: max-age=3600
+            Content-Type: text/css; charset=utf-8
+            
+          /*.@(jpg|jpeg|png|gif|svg|webp|ico)
+            Cache-Control: max-age=86400, public
+          HEADERSEOF
+          
+          # Create _redirects
+          cat > _redirects << 'REDIRECTSEOF'
+          /home    /index.html    301
+          /login   /auth.html      301
+          /signup  /auth.html      301
+          REDIRECTSEOF
+          
+          echo "✅ Cloudflare config created"
+          echo "📄 Files to deploy:"
+          ls -la *.html *.js _headers _redirects 2>/dev/null
+      
+      - name: ☁️ Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy . --project-name=${{ env.CLOUDFLARE_PROJECT }} --branch=${{ env.DEPLOY_BRANCH }}
+      
+      - name: ✅ Cloudflare Deploy Success
+        run: |
+          echo "╔══════════════════════════════════════╗"
+          echo "║  ☁️  CLOUDFLARE DEPLOY SUCCESS       ║"
+          echo "╠══════════════════════════════════════╣"
+          echo "║  Project: ${{ env.CLOUDFLARE_PROJECT }}"
+          echo "║  Branch:  ${{ env.DEPLOY_BRANCH }}"
+          echo "║  Time:    $(date '+%Y-%m-%d %H:%M')"
+          echo "╚══════════════════════════════════════╝"
+
+  # ═══════════════════════════════════════════════════════
+  # 🟠 5. PERFORMANCE CHECK - فحص الأداء
+  # ═══════════════════════════════════════════════════════
+  performance:
+    name: 🚀 Performance Check
+    runs-on: ubuntu-latest
+    needs: [deploy-firebase, deploy-cloudflare]
+    if: success() || failure()
+    
+    steps:
+      - name: 📥 Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: orange-crystal-build
+      
+      - name: 📏 Calculate Performance Metrics
+        run: |
+          echo "🚀 Performance Report"
+          echo "══════════════════════════════"
+          
+          total_size=0
+          total_files=0
+          
+          for file in *.html *.js; do
+            if [ -f "$file" ]; then
+              size=$(wc -c < "$file")
+              total_size=$((total_size + size))
+              total_files=$((total_files + 1))
+              
+              # Estimate load time (assume 10Mbps connection)
+              load_time=$(echo "scale=2; $size * 8 / 10000000" | bc)
+              echo "  📄 $file: ${size}B (~${load_time}s load time)"
+            fi
+          done
+          
+          total_kb=$((total_size / 1024))
+          echo ""
+          echo "  📊 Total: $total_files files, ${total_kb}KB"
+          
+          if [ $total_kb -gt 1000 ]; then
+            echo "  ⚠️ WARNING: Bundle size > 1MB"
+          else
+            echo "  ✅ Bundle size OK"
+          fi
+
+  # ═══════════════════════════════════════════════════════
+  # 🟠 6. NOTIFICATION - إشعارات
+  # ═══════════════════════════════════════════════════════
+  notify:
+    name: 📢 Send Notification
+    runs-on: ubuntu-latest
+    needs: [build, validate, deploy-firebase, deploy-cloudflare, performance]
+    if: always()
+    
+    steps:
+      - name: 📊 Generate Status Report
+        run: |
+          echo "╔══════════════════════════════════════╗"
+          echo "║  🟠 ORANGE CRYSTAL - BUILD REPORT   ║"
+          echo "╠══════════════════════════════════════╣"
+          echo "║  Repository: ${{ github.repository }}"
+          echo "║  Branch:     ${{ github.ref_name }}"
+          echo "║  Commit:     ${{ github.sha }}"
+          echo "║  Author:     ${{ github.actor }}"
+          echo "║  Time:       $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "╠══════════════════════════════════════╣"
+          echo "║  Jobs Status:"
+          echo "║    Build:     ${{ needs.build.result }}"
+          echo "║    Validate:  ${{ needs.validate.result }}"
+          echo "║    Firebase:  ${{ needs.deploy-firebase.result }}"
+          echo "║    Cloudflare:${{ needs.deploy-cloudflare.result }}"
+          echo "║    Perf:      ${{ needs.performance.result }}"
+          echo "╚══════════════════════════════════════╝"
+      
+      - name: 🎉 Success Message
+        if: success()
+        run: |
+          echo ""
+          echo "🟠✨ جميع المراحل اكتملت بنجاح!"
+          echo ""
+          echo "🌐 الروابط:"
+          echo "   Firebase:   https://${{ env.FIREBASE_PROJECT }}.web.app"
+          echo "   Cloudflare: https://${{ env.CLOUDFLARE_PROJECT }}.pages.dev"
+          echo ""
+      
+      - name: ⚠️ Failure Warning
+        if: failure()
+        run: |
+          echo ""
+          echo "❌ حدث خطأ في عملية النشر!"
+          echo "   راجع logs أعلاه للمزيد من التفاصيل"
+          echo ""
+
+  # ═══════════════════════════════════════════════════════
+  # 🟠 7. AUTO TAG - إضافة تاق تلقائي
+  # ═══════════════════════════════════════════════════════
+  auto-tag:
+    name: 🏷️ Create Release Tag
+    runs-on: ubuntu-latest
+    needs: notify
+    if: github.event_name == 'push' && success()
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+      
+      - name: 🏷️ Generate Tag
+        run: |
+          TAG="v$(date +'%Y.%m.%d')-build-${GITHUB_RUN_NUMBER}"
+          echo "🏷️ Creating tag: $TAG"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git tag -a "$TAG" -m "🟠 Orange Crystal Auto Release $TAG
+          
+          📦 Build #${{ github.run_number }}
+          🔗 Commit: ${{ github.sha }}
+          🕐 $(date '+%Y-%m-%d %H:%M:%S')"
+          
+          git push origin "$TAG"
+          
+          echo "✅ Tag $TAG created successfully!"
