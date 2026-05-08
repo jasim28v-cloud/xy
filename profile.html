@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>🟠 ORANGE CRYSTAL | ملف شخصي</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root{--glass:rgba(249,115,22,0.04);--border:rgba(249,115,22,0.15);--accent:#f97316;--accent2:#fb923c;--bg:#0a0400;--card:rgba(249,115,22,0.06)}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:#fff;min-height:100vh;overflow-y:auto;-webkit-tap-highlight-color:transparent}
+        
+        .cover{height:200px;position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:40px;transition:background 0.5s}
+        .btn-back{position:fixed;top:20px;right:20px;background:rgba(0,0,0,0.6);backdrop-filter:blur(15px);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:50;border:1px solid var(--border);color:#fff;font-size:16px;transition:all 0.3s}
+        .btn-back:hover{background:rgba(249,115,22,0.3)}
+        
+        .avatar-wrap{position:relative;z-index:2;margin-bottom:-40px}
+        .avatar-lg{width:120px;height:120px;border-radius:50%;overflow:hidden;border:4px solid var(--accent);box-shadow:0 15px 50px rgba(249,115,22,0.5);cursor:pointer;background:var(--bg)}
+        .avatar-lg img{width:100%;height:100%;object-fit:cover}
+        .avatar-edit-btn{position:absolute;bottom:5px;right:5px;width:30px;height:30px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid var(--bg);color:#fff;font-size:12px;box-shadow:0 4px 15px rgba(0,0,0,0.4)}
+        .online-dot{position:absolute;top:10px;right:10px;width:18px;height:18px;background:#22c55e;border-radius:50%;border:3px solid var(--bg);z-index:3}
+        
+        .profile-info{padding:50px 20px 20px;text-align:center}
+        .username{font-size:22px;font-weight:800;margin-bottom:4px}
+        .bio-text{font-size:13px;opacity:0.6;margin-bottom:8px;max-width:300px;margin-left:auto;margin-right:auto}
+        .last-seen{font-size:11px;opacity:0.4;display:flex;align-items:center;justify-content:center;gap:5px}
+        
+        .stats-row{display:flex;justify-content:center;gap:30px;margin:15px 0;padding:15px;background:var(--card);border-radius:16px;border:1px solid var(--border)}
+        .stat-item{text-align:center;cursor:pointer;transition:transform 0.2s}
+        .stat-item:hover{transform:scale(1.05)}
+        .stat-val{font-size:20px;font-weight:700;color:var(--accent2)}
+        .stat-lbl{font-size:10px;opacity:0.5;margin-top:2px}
+        
+        .action-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:20px}
+        .btn{background:var(--card);border:1px solid var(--border);padding:10px 20px;border-radius:25px;color:#fff;cursor:pointer;font-size:13px;transition:all 0.3s;display:flex;align-items:center;gap:6px}
+        .btn:hover{background:rgba(249,115,22,0.15);border-color:var(--accent)}
+        .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;font-weight:700;box-shadow:0 8px 25px rgba(249,115,22,0.4)}
+        .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 35px rgba(249,115,22,0.6)}
+        .btn-follow{background:linear-gradient(135deg,#ef4444,#dc2626);border:none;font-weight:700}
+        .btn-follow.following{background:linear-gradient(135deg,var(--accent),var(--accent2))}
+        
+        .section-title{font-size:16px;font-weight:700;padding:0 20px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+        .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:0 8px 80px}
+        .thumb{aspect-ratio:9/16;background:rgba(249,115,22,0.05);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden;transition:transform 0.2s}
+        .thumb:hover{transform:scale(1.03);z-index:1}
+        .thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+        .thumb i{font-size:24px;color:#fff;z-index:1;opacity:0;transition:opacity 0.3s;text-shadow:0 2px 10px rgba(0,0,0,0.5)}
+        .thumb:hover i{opacity:1}
+        .thumb .play-count{position:absolute;bottom:6px;left:6px;font-size:10px;background:rgba(0,0,0,0.7);padding:3px 8px;border-radius:10px}
+        
+        /* EDIT PANEL */
+        .edit-panel{position:fixed;bottom:0;left:0;right:0;background:rgba(10,4,0,0.98);backdrop-filter:blur(30px);border-top:2px solid var(--accent);border-radius:24px 24px 0 0;padding:24px 20px 40px;z-index:200;transform:translateY(100%);transition:transform 0.4s cubic-bezier(0.4,0,0.2,1);max-height:80vh;overflow-y:auto}
+        .edit-panel.show{transform:translateY(0)}
+        .edit-panel h3{font-size:18px;font-weight:700;margin-bottom:20px;color:var(--accent2);text-align:center}
+        .edit-panel label{display:block;font-size:12px;opacity:0.7;margin-bottom:6px;margin-top:14px}
+        .edit-panel input,.edit-panel textarea{width:100%;padding:12px 16px;border-radius:14px;background:var(--card);border:1px solid var(--border);color:#fff;font-size:14px;outline:none;resize:none;font-family:'Segoe UI',sans-serif;transition:border 0.3s}
+        .edit-panel input:focus,.edit-panel textarea:focus{border-color:var(--accent)}
+        .edit-panel textarea{min-height:80px}
+        .edit-actions{display:flex;gap:10px;margin-top:20px}
+        .edit-actions button{flex:1;padding:12px;border-radius:25px;font-weight:700;cursor:pointer;font-size:14px;transition:all 0.3s}
+        .btn-save{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff}
+        .btn-cancel{background:var(--card);border:1px solid var(--border);color:#fff}
+        .btn-save:hover{box-shadow:0 8px 25px rgba(249,115,22,0.5);transform:translateY(-2px)}
+        
+        .overlay-panel{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:150;display:none}
+        .overlay-panel.show{display:block}
+        
+        .spinner{width:36px;height:36px;border:3px solid rgba(249,115,22,0.2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;margin:30px auto}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .load-center{display:flex;align-items:center;justify-content:center;min-height:80vh;flex-direction:column;gap:12px;color:rgba(255,255,255,0.5)}
+        
+        .empty-state{text-align:center;opacity:0.5;padding:40px 20px;grid-column:1/-1}
+        .empty-state i{font-size:48px;color:var(--accent);margin-bottom:12px;display:block}
+        
+        .toast-msg{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(10,4,0,0.95);padding:12px 24px;border-radius:30px;z-index:300;border:1px solid var(--border);font-size:13px;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
+        .toast-msg.show{opacity:1}
+
+        .admin-section{margin:20px;padding:16px;background:rgba(249,115,22,0.05);border-radius:16px;border:1px solid var(--border)}
+        .admin-section h3{color:#fb923c;font-weight:700;margin-bottom:12px}
+        .admin-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+        .admin-stat{background:rgba(0,0,0,0.3);border-radius:10px;padding:10px;text-align:center}
+        .admin-stat .num{font-size:20px;font-weight:700;color:#fb923c}
+        .admin-stat .lbl{font-size:10px;opacity:0.5}
+        .admin-item{display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.3);padding:10px;border-radius:10px;margin-bottom:6px}
+        .admin-avatar{width:32px;height:32px;border-radius:50%;overflow:hidden}
+        .admin-avatar img{width:100%;height:100%;object-fit:cover}
+        .admin-btn{padding:5px 12px;border-radius:15px;font-size:11px;cursor:pointer;border:none;font-weight:600;color:#fff}
+        .btn-verify{background:rgba(251,146,60,0.3)}
+        .btn-unverify{background:rgba(239,68,68,0.3)}
+    </style>
+</head>
+<body>
+
+<div class="load-center" id="loader"><div class="spinner"></div><span>🟠 تحميل الملف...</span></div>
+
+<div id="content" style="display:none">
+    <div class="cover" id="profileCover">
+        <button class="btn-back" onclick="history.back()"><i class="fas fa-arrow-right"></i></button>
+        <div class="avatar-wrap">
+            <div class="avatar-lg" id="avatarDisplay">
+                <img src="" alt="avatar" id="avatarImg">
+                <div class="avatar-edit-btn" id="avatarEditBtn" onclick="document.getElementById('avatarInput').click()" style="display:none">
+                    <i class="fas fa-camera"></i>
+                </div>
+                <div class="online-dot" id="onlineDot" style="display:none"></div>
+            </div>
+        </div>
+    </div>
+    <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
+
+    <div class="profile-info">
+        <div class="username" id="nameDisplay"></div>
+        <div class="bio-text" id="bioDisplay"></div>
+        <div class="last-seen" id="lastSeenDisplay"></div>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-item" onclick="showList('following')"><div class="stat-val" id="statFollowing">0</div><div class="stat-lbl">يتابع</div></div>
+        <div class="stat-item" onclick="showList('followers')"><div class="stat-val" id="statFollowers">0</div><div class="stat-lbl">متابع</div></div>
+        <div class="stat-item"><div class="stat-val" id="statLikes">0</div><div class="stat-lbl">إعجابات</div></div>
+    </div>
+
+    <div class="action-btns" id="actionsBar"></div>
+
+    <div class="section-title"><i class="fas fa-video" style="color:var(--accent)"></i> الفيديوهات</div>
+    <div class="grid" id="videosGrid"></div>
+</div>
+
+<div class="overlay-panel" id="overlayPanel" onclick="closeEditPanel()"></div>
+<div class="edit-panel" id="editPanel">
+    <h3>🟠 لوحة تعديل الملف الشخصي</h3>
+    <label>👤 اسم المستخدم</label>
+    <input type="text" id="editUsername" placeholder="اسم المستخدم">
+    <label>📝 السيرة الذاتية</label>
+    <textarea id="editBio" placeholder="اكتب شيئاً عن نفسك..."></textarea>
+    <label>🎨 لون الغلاف</label>
+    <div id="coverColors" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
+    <div class="edit-actions">
+        <button class="btn-cancel" onclick="closeEditPanel()">إلغاء</button>
+        <button class="btn-save" onclick="saveProfile()"><i class="fas fa-save"></i> حفظ التغييرات</button>
+    </div>
+</div>
+
+<div class="toast-msg" id="toastMsg">✅ تم</div>
+
+<script src="firebase-config.js"></script>
+<script>
+    let profileUserId = null;
+    let currentUser = null;
+    let currentUserData = null;
+    let allVideos = [];
+    let allUsers = {};
+    let isOwnProfile = false;
+    let _selectedCover = null;
+
+    auth.onAuthStateChanged(async u => {
+        if (!u) { window.location.href = 'auth.html'; return; }
+        currentUser = u;
+        
+        const params = new URLSearchParams(window.location.search);
+        profileUserId = params.get('uid') || u.uid;
+        isOwnProfile = (profileUserId === u.uid);
+        
+        const snap = await db.ref('users/' + u.uid).get();
+        if (snap.exists()) currentUserData = { uid: u.uid, ...snap.val() };
+        
+        await loadAll();
+        await loadProfile();
+        
+        if (!isOwnProfile) {
+            db.ref('presence/' + profileUserId).on('value', s => {
+                const isOnline = s.val();
+                const dot = document.getElementById('onlineDot');
+                const lastSeen = document.getElementById('lastSeenDisplay');
+                if (dot) dot.style.display = isOnline ? 'block' : 'none';
+                if (lastSeen) {
+                    const userData = allUsers[profileUserId];
+                    if (userData) {
+                        lastSeen.innerHTML = isOnline 
+                            ? '<i class="fas fa-circle" style="color:#22c55e;font-size:8px"></i> نشط الآن'
+                            : '<i class="fas fa-clock"></i> آخر ظهور: ' + formatTime(userData.lastSeen);
+                    }
+                }
+            });
+        }
+        
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+    });
+
+    async function loadAll() {
+        const us = await db.ref('users').once('value'); 
+        allUsers = us.val() || {};
+        const vs = await db.ref('videos').once('value'); 
+        allVideos = Object.entries(vs.val() || {}).map(([k, v]) => ({ id: k, ...v }));
+    }
+
+    async function loadProfile() {
+        const u = allUsers[profileUserId];
+        if (!u) {
+            document.getElementById('content').innerHTML = '<div class="empty-state" style="padding-top:100px"><i class="fas fa-user-slash"></i><p>المستخدم غير موجود</p></div>';
+            return;
+        }
+
+        document.getElementById('nameDisplay').innerHTML = '@' + (u.username || 'مستخدم') + (u.isVerified ? ' <span style="color:#fb923c;font-size:16px">✅</span>' : '');
+        document.getElementById('bioDisplay').innerText = u.bio || 'لم تتم إضافة سيرة ذاتية بعد';
+        document.getElementById('statFollowing').innerText = Object.keys(u.following || {}).length;
+        document.getElementById('statFollowers').innerText = Object.keys(u.followers || {}).length;
+        
+        const uvs = allVideos.filter(v => v.sender === profileUserId);
+        document.getElementById('statLikes').innerText = uvs.reduce((s, v) => s + (v.likes || 0), 0);
+        
+        document.getElementById('profileCover').style.background = u.coverColor || COVER_COLORS[0];
+        document.getElementById('avatarImg').src = u.avatarUrl || (DICEBEAR_URL + '?seed=' + profileUserId);
+
+        if (isOwnProfile) {
+            document.getElementById('avatarEditBtn').style.display = 'flex';
+        }
+
+        const lastSeen = document.getElementById('lastSeenDisplay');
+        if (!isOwnProfile) {
+            const presenceSnap = await db.ref('presence/' + profileUserId).get();
+            const isOnline = presenceSnap.val();
+            document.getElementById('onlineDot').style.display = isOnline ? 'block' : 'none';
+            lastSeen.innerHTML = isOnline 
+                ? '<i class="fas fa-circle" style="color:#22c55e;font-size:8px"></i> نشط الآن'
+                : '<i class="fas fa-clock"></i> آخر ظهور: ' + formatTime(u.lastSeen || u.createdAt);
+        }
+
+        const g = document.getElementById('videosGrid');
+        g.innerHTML = '';
+        if (!uvs.length) {
+            g.innerHTML = '<div class="empty-state"><i class="fas fa-video-slash"></i><p>لا توجد فيديوهات</p></div>';
+        } else {
+            uvs.forEach(v => {
+                const d = document.createElement('div');
+                d.className = 'thumb';
+                d.innerHTML = `${v.thumbnail ? `<img src="${v.thumbnail}">` : ''}<i class="fas fa-play"></i><span class="play-count">❤️ ${v.likes || 0}</span>`;
+                d.onclick = () => window.open(v.url, '_blank');
+                g.appendChild(d);
+            });
+        }
+
+        const actionsBar = document.getElementById('actionsBar');
+        if (isOwnProfile) {
+            actionsBar.innerHTML = `
+                <button class="btn btn-primary" onclick="openEditPanel()"><i class="fas fa-edit"></i> تعديل الملف</button>
+                <button class="btn" onclick="window.location.href='chat.html'"><i class="fas fa-envelope"></i> الرسائل</button>
+                <button class="btn" onclick="auth.signOut();window.location.href='auth.html'"><i class="fas fa-sign-out-alt"></i> خروج</button>`;
+        } else {
+            const isFollowing = currentUserData?.following?.[profileUserId];
+            actionsBar.innerHTML = `
+                <button class="btn btn-follow ${isFollowing ? 'following' : ''}" id="followBtn" onclick="toggleFollowUser()">${isFollowing ? '<i class="fas fa-user-check"></i> متابع' : '<i class="fas fa-user-plus"></i> متابعة'}</button>
+                <button class="btn btn-primary" onclick="window.location.href='chat.html?uid=${profileUserId}'"><i class="fas fa-comment"></i> مراسلة</button>
+                <button class="btn" onclick="copyProfile()"><i class="fas fa-copy"></i> نسخ المعلومات</button>`;
+        }
+
+        if (isOwnProfile && ADMIN_EMAILS.includes(currentUser?.email)) {
+            loadAdminPanel();
+        }
+    }
+
+    function openEditPanel() {
+        const u = allUsers[profileUserId] || currentUserData;
+        document.getElementById('editUsername').value = u.username || '';
+        document.getElementById('editBio').value = u.bio || '';
+        _selectedCover = u.coverColor;
+        
+        const colorsDiv = document.getElementById('coverColors');
+        colorsDiv.innerHTML = COVER_COLORS.map((c, i) => `<div onclick="selectCover('${c.replace(/'/g, "\'")}', this)" style="width:40px;height:40px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${_selectedCover === c ? '#fff' : 'transparent'};transition:all 0.2s" title="غلاف ${i+1}"></div>`).join('');
+        
+        document.getElementById('editPanel').classList.add('show');
+        document.getElementById('overlayPanel').classList.add('show');
+    }
+
+    function closeEditPanel() {
+        document.getElementById('editPanel').classList.remove('show');
+        document.getElementById('overlayPanel').classList.remove('show');
+    }
+
+    function selectCover(color, el) {
+        _selectedCover = color;
+        document.getElementById('profileCover').style.background = color;
+        document.querySelectorAll('#coverColors div').forEach(d => d.style.borderColor = 'transparent');
+        el.style.borderColor = '#fff';
+    }
+
+    async function saveProfile() {
+        const username = document.getElementById('editUsername').value.trim();
+        const bio = document.getElementById('editBio').value.trim();
+        
+        if (!username || username.length < 3) { showToast('❌ اسم المستخدم 3 أحرف على الأقل'); return; }
+        
+        const updates = { username, bio };
+        if (_selectedCover) updates.coverColor = _selectedCover;
+        
+        try {
+            await db.ref('users/' + profileUserId).update(updates);
+            closeEditPanel();
+            await loadAll();
+            await loadProfile();
+            showToast('✅ تم حفظ التغييرات بنجاح');
+        } catch(e) {
+            showToast('❌ حدث خطأ');
+            console.error(e);
+        }
+    }
+
+    async function uploadAvatar(inp) {
+        const file = inp.files[0]; 
+        if (!file) return;
+        showToast('⏳ جاري رفع الصورة...');
+        const fd = new FormData(); 
+        fd.append('file', file); 
+        fd.append('upload_preset', UPLOAD_PRESET);
+        try {
+            const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUD_NAME + '/image/upload', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.secure_url) {
+                await db.ref('users/' + profileUserId).update({ avatarUrl: data.secure_url, hasCustomAvatar: true });
+                document.getElementById('avatarImg').src = data.secure_url;
+                showToast('✅ تم تحديث الصورة الشخصية');
+            } else {
+                showToast('❌ فشل رفع الصورة');
+            }
+        } catch(e) { showToast('❌ خطأ في الرفع'); console.error(e); }
+        inp.value = '';
+    }
+
+    async function toggleFollowUser() {
+        if (!currentUser || isOwnProfile) return;
+        const btn = document.getElementById('followBtn');
+        const userRef = db.ref('users/' + currentUser.uid + '/following/' + profileUserId);
+        const targetRef = db.ref('users/' + profileUserId + '/followers/' + currentUser.uid);
+        const snap = await userRef.get();
+        if (snap.exists()) {
+            await userRef.remove();
+            await targetRef.remove();
+            btn.innerHTML = '<i class="fas fa-user-plus"></i> متابعة';
+            btn.classList.remove('following');
+        } else {
+            await userRef.set(true);
+            await targetRef.set(true);
+            btn.innerHTML = '<i class="fas fa-user-check"></i> متابع';
+            btn.classList.add('following');
+        }
+        await loadAll();
+        await loadProfile();
+    }
+
+    async function copyProfile() {
+        const u = allUsers[profileUserId];
+        const text = `👤 @${u.username || 'مستخدم'}\n📝 ${u.bio || ''}\n🟠 Orange Crystal 2026`;
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch(e) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        showToast('✅ تم نسخ معلومات الملف الشخصي');
+    }
+
+    function showList(type) {
+        const u = allUsers[profileUserId];
+        const list = type === 'followers' ? (u?.followers || {}) : (u?.following || {});
+        const ids = Object.keys(list);
+        if (!ids.length) { alert('لا يوجد'); return; }
+        const names = ids.map(id => { const user = allUsers[id]; return user ? '@' + user.username : 'مستخدم'; }).join('\n');
+        alert((type === 'followers' ? 'المتابِعون' : 'المتابَعون') + ':\n' + names);
+    }
+
+    function showToast(msg) {
+        const toast = document.getElementById('toastMsg');
+        toast.innerText = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    function formatTime(ts) {
+        if (!ts) return 'غير معروف';
+        const now = Date.now();
+        const diff = now - ts;
+        const mins = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+        if (mins < 1) return 'الآن';
+        if (mins < 60) return 'منذ ' + mins + ' دقيقة';
+        if (hours < 24) return 'منذ ' + hours + ' ساعة';
+        if (days < 7) return 'منذ ' + days + ' يوم';
+        return new Date(ts).toLocaleDateString('ar-SA');
+    }
+
+    async function loadAdminPanel() {
+        const container = document.querySelector('.grid');
+        if (!container) return;
+        const adminDiv = document.createElement('div');
+        adminDiv.className = 'admin-section';
+        adminDiv.style.cssText = 'margin:20px 8px';
+        adminDiv.innerHTML = `<h3><i class="fas fa-shield-alt"></i> لوحة تحكم الأدمن</h3>
+            <div class="admin-stats">
+                <div class="admin-stat"><div class="num">${Object.keys(allUsers).length}</div><div class="lbl">مستخدمين</div></div>
+                <div class="admin-stat"><div class="num">${allVideos.length}</div><div class="lbl">فيديوهات</div></div>
+                <div class="admin-stat"><div class="num">${allVideos.reduce((s,v)=>s+(v.likes||0),0)}</div><div class="lbl">إعجابات</div></div>
+            </div>
+            <div id="adminUserList" style="max-height:300px;overflow-y:auto"></div>`;
+        container.after(adminDiv);
+        loadAdminUsers();
+    }
+
+    async function loadAdminUsers() {
+        const list = document.getElementById('adminUserList');
+        if (!list) return;
+        list.innerHTML = Object.entries(allUsers).filter(([_, u]) => !u.banned).slice(0, 20).map(([id, u]) => `<div class="admin-item"><div style="display:flex;align-items:center;gap:8px"><div class="admin-avatar"><img src="${u.avatarUrl || (DICEBEAR_URL + '?seed=' + id)}"></div><span>@${u.username || '?'} ${u.isVerified ? '✅' : ''}</span></div><button class="admin-btn ${u.isVerified ? 'btn-unverify' : 'btn-verify'}" onclick="toggleVerifyUser('${id}')">${u.isVerified ? 'إلغاء التوثيق' : 'توثيق ✅'}</button></div>`).join('');
+    }
+
+    window.toggleVerifyUser = async function(id) {
+        if (!confirm('تأكيد تغيير حالة التوثيق؟')) return;
+        const snap = await db.ref('users/' + id).once('value');
+        const data = snap.val();
+        await db.ref('users/' + id).update({ 
+            isVerified: !data.isVerified,
+            verifiedAt: !data.isVerified ? Date.now() : null,
+            verifiedBy: !data.isVerified ? currentUser.uid : null
+        });
+        await loadAll();
+        await loadProfile();
+        showToast('✅ تم تحديث حالة التوثيق');
+    };
+
+    console.log('🟠 Orange Crystal Profile v2 Ready ✨');
+</script>
+</body>
+</html>
